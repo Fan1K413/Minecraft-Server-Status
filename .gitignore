@@ -1,12 +1,44 @@
+# Dependencies and package-manager artifacts
 node_modules/
+.pnpm-store/
+
+# Build outputs and caches
 .next/
+out/
 dist/
+.turbo/
+*.tsbuildinfo
 coverage/
+playwright-report/
+test-results/
+
+# Runtime data and local configuration
 data/
 .env
+.env.*
+!.env.example
 config/server.yaml
 *.db
 *.db-shm
 *.db-wal
-playwright-report/
-test-results/
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local tooling and editor files
+.claude/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS and deployment artifacts
+.DS_Store
+Thumbs.db
+.vercel/

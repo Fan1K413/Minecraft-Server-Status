@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "tsx watch src/index.ts", "build": "tsc", "typecheck": "tsc --noEmit" },
+  "scripts": { "dev": "set SERVER_CONFIG_PATH=../../config/server.yaml&& set DATABASE_URL=../../data/status.db&& tsx watch src/index.ts", "build": "tsc", "typecheck": "tsc --noEmit" },
   "dependencies": {
     "@minecraft-status/config": "workspace:*",
+    "@minecraft-status/core": "workspace:*",
     "@minecraft-status/database": "workspace:*",
     "minecraft-protocol": "^1.60.0"
   }

@@ -1,6 +1,8 @@
-import { ping } from "minecraft-protocol";
+import minecraftProtocol from "minecraft-protocol";
+const { ping } = minecraftProtocol;
 import dgram from "node:dgram";
 import { loadServerConfig } from "@minecraft-status/config";
+import { normalizeMotd, motdText } from "@minecraft-status/core";
 import { StatusDatabase, type JavaDetails } from "@minecraft-status/database";
 
 const config = await loadServerConfig();
@@ -11,12 +13,6 @@ interface ProbeSuccess { success: true; java?: JavaDetails; }
 interface ProbeFailure { success: false; errorCode: string; }
 type ProbeResult = ProbeSuccess | ProbeFailure;
 
-function normalizeMotd(description: unknown): string {
-  if (typeof description === "string") return description.slice(0, 500);
-  if (description && typeof description === "object") return JSON.stringify(description).replace(/[<>]/g, "").slice(0, 500);
-  return "";
-}
-
 async function pingJava(host: string, port: number, timeoutMs: number): Promise<ProbeResult> {
   const started = performance.now();
   try {
@@ -24,11 +20,12 @@ async function pingJava(host: string, port: number, timeoutMs: number): Promise<
       new Promise<any>((resolve, reject) => ping({ host, port }, (error: Error | null, result: unknown) => error ? reject(error) : resolve(result))),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), timeoutMs)),
     ]);
-    const data = response as { players?: { online?: number; max?: number }; version?: { name?: string }; description?: unknown; favicon?: string };
+    const data = response as { players?: { online?: number; max?: number }; version?: { name?: string }; description?: unknown; favicon?: string; latency?: number };
+    const motdParts = normalizeMotd(data.description);
     return { success: true, java: {
       playersOnline: Number(data.players?.online ?? 0), playersMax: Number(data.players?.max ?? 0),
-      versionName: String(data.version?.name ?? "未知"), latencyMs: Math.round(performance.now() - started),
-      motd: normalizeMotd(data.description), favicon: typeof data.favicon === "string" && data.favicon.length <= 100_000 ? data.favicon : null,
+      versionName: String(data.version?.name ?? "未知"), latencyMs: Number.isFinite(data.latency) ? Math.round(Number(data.latency)) : Math.round(performance.now() - started),
+      motd: motdText(motdParts), motdParts, favicon: typeof data.favicon === "string" && data.favicon.length <= 100_000 ? data.favicon : null,
     }};
   } catch (error) {
     return { success: false, errorCode: error instanceof Error && error.message === "TIMEOUT" ? "TIMEOUT" : "JAVA_PING_FAILED" };

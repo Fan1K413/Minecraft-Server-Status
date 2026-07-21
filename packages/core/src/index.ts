@@ -1,3 +1,5 @@
+export * from "./motd";
+
 export type Edition = "JAVA" | "BEDROCK";
 export type EndpointStatus = "OPERATIONAL" | "OUTAGE" | "UNKNOWN";
 export type OverallStatus = EndpointStatus | "PARTIAL_OUTAGE" | "MAINTENANCE";
@@ -89,6 +91,27 @@ export function downsampleTrend(points: TrendPoint[], maxPoints: number): TrendP
     });
   }
   return result;
+}
+
+export type HistoryRange = "24h" | "3d" | "7d" | "15d" | "30d" | "all";
+export const historyRangeHours: Record<Exclude<HistoryRange, "all">, number> = { "24h": 24, "3d": 72, "7d": 168, "15d": 360, "30d": 720 };
+export function parseHistoryRange(value: string | null): HistoryRange { return value && value in historyRangeHours || value === "all" ? value as HistoryRange : "7d"; }
+
+export interface AvailabilityBucket {
+  startAt: string;
+  endAt: string;
+  successes: number;
+  failures: number;
+  samples: number;
+  percentage: number | null;
+}
+
+export interface DailyAvailability {
+  date: string;
+  successes: number;
+  failures: number;
+  samples: number;
+  percentage: number | null;
 }
 
 export function calculateAvailability(successes: number, failures: number): number | null {

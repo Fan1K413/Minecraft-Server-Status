@@ -2,7 +2,7 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
-  "scripts": { "dev": "next dev", "build": "next build", "start": "next start", "typecheck": "tsc --noEmit" },
+  "scripts": { "dev": "set SERVER_CONFIG_PATH=../../config/server.yaml&& set DATABASE_URL=../../data/status.db&& next dev", "build": "next build", "start": "set SERVER_CONFIG_PATH=../../config/server.yaml&& set DATABASE_URL=../../data/status.db&& next start", "typecheck": "tsc --noEmit" },
   "dependencies": {
     "@minecraft-status/config": "workspace:*",
     "@minecraft-status/core": "workspace:*",

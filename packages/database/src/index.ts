@@ -1,5 +1,7 @@
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import Database from "better-sqlite3";
-import type { Edition, EndpointSnapshot, TrendPoint } from "@minecraft-status/core";
+import { calculateAvailability, decodeMotd, encodeMotd, motdText, type AvailabilityBucket, type DailyAvailability, type Edition, type EndpointSnapshot, type MotdPart, type TrendPoint } from "@minecraft-status/core";
 
 export interface JavaDetails {
   playersOnline: number;
@@ -7,6 +9,7 @@ export interface JavaDetails {
   versionName: string;
   latencyMs: number;
   motd: string;
+  motdParts: MotdPart[];
   favicon: string | null;
 }
 
@@ -59,6 +62,7 @@ export class StatusDatabase {
   private readonly db: Database.Database;
 
   constructor(path = process.env.DATABASE_URL?.replace(/^file:/, "") ?? "./data/status.db") {
+    mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path);
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 5000");
@@ -78,7 +82,7 @@ export class StatusDatabase {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(result.edition, result.checkedAt.toISOString(), Number(result.success), result.errorCode ?? null,
           result.java?.playersOnline ?? null, result.java?.playersMax ?? null, result.java?.versionName ?? null,
-          result.java?.latencyMs ?? null, result.java?.motd ?? null, result.java?.favicon ?? null);
+          result.java?.latencyMs ?? null, result.java ? encodeMotd(result.java.motdParts) : null, result.java?.favicon ?? null);
 
       this.db.prepare(`INSERT INTO endpoint_snapshots (edition, status, consecutive_successes, consecutive_failures, checked_at, last_success_at, error_code, players_online, players_max, version_name, latency_ms, motd, favicon)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -91,7 +95,8 @@ export class StatusDatabase {
           result.success ? result.checkedAt.toISOString() : existing?.lastSuccessAt?.toISOString() ?? null,
           result.errorCode ?? null, result.java?.playersOnline ?? existing?.java?.playersOnline ?? null,
           result.java?.playersMax ?? existing?.java?.playersMax ?? null, result.java?.versionName ?? existing?.java?.versionName ?? null,
-          result.java?.latencyMs ?? existing?.java?.latencyMs ?? null, result.java?.motd ?? existing?.java?.motd ?? null,
+          result.java?.latencyMs ?? existing?.java?.latencyMs ?? null,
+          result.java ? encodeMotd(result.java.motdParts) : existing?.java ? encodeMotd(existing.java.motdParts) : null,
           result.java?.favicon ?? existing?.java?.favicon ?? null);
     });
     tx();
@@ -102,14 +107,39 @@ export class StatusDatabase {
     return row ? mapSnapshot(row) : null;
   }
 
-  getHistory(rangeHours: number, maxPoints: number): TrendPoint[] {
-    const since = new Date(Date.now() - rangeHours * 3_600_000).toISOString();
+  getHistory(rangeHours: number, maxPoints: number, now = new Date()): TrendPoint[] {
+    const since = new Date(now.getTime() - rangeHours * 3_600_000).toISOString();
     const rows = this.db.prepare(`SELECT checked_at, players_online, latency_ms FROM check_results
       WHERE edition = 'JAVA' AND checked_at >= ? ORDER BY checked_at ASC`).all(since) as Record<string, unknown>[];
     const stride = Math.max(1, Math.ceil(rows.length / maxPoints));
-    return rows.filter((_, index) => index % stride === 0).map((row) => ({
+    const selected = rows.filter((_, index) => index % stride === 0);
+    if (rows.length && selected.at(-1) !== rows.at(-1)) selected.push(rows.at(-1)!);
+    return selected.map((row) => ({
       at: String(row.checked_at), playersOnline: numberOrNull(row.players_online), latencyMs: numberOrNull(row.latency_ms),
     }));
+  }
+
+  getDailyAvailability(edition: Edition, days = 30, now = new Date()): DailyAvailability[] {
+    const windowDays = Math.max(1, Math.min(days, 90));
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - windowDays + 1));
+    const rows = this.db.prepare(`SELECT substr(checked_at, 1, 10) AS date,
+      SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) AS successes,
+      SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) AS failures
+      FROM check_results WHERE edition = ? AND checked_at >= ? GROUP BY substr(checked_at, 1, 10)`).all(edition, start.toISOString()) as Record<string, unknown>[];
+    const byDate = new Map(rows.map((row) => [String(row.date), { successes: Number(row.successes), failures: Number(row.failures) }]));
+    return Array.from({ length: windowDays }, (_, index) => {
+      const day = new Date(start.getTime() + index * 86_400_000).toISOString().slice(0, 10);
+      const counts = byDate.get(day) ?? { successes: 0, failures: 0 };
+      return { date: day, ...counts, samples: counts.successes + counts.failures, percentage: calculateAvailability(counts.successes, counts.failures) };
+    });
+  }
+
+  getAvailabilityBuckets(edition: Edition, rangeHours: number, bucketCount = 30, now = new Date()): AvailabilityBucket[] {
+    const end = now.getTime(); const start = end - rangeHours * 3_600_000; const bucketMs = (end - start) / bucketCount;
+    const buckets = Array.from({ length: bucketCount }, (_, index) => ({ startAt: new Date(start + index * bucketMs).toISOString(), endAt: new Date(start + (index + 1) * bucketMs).toISOString(), successes: 0, failures: 0, samples: 0, percentage: null as number | null }));
+    const rows = this.db.prepare("SELECT checked_at, success FROM check_results WHERE edition = ? AND checked_at >= ? AND checked_at < ? ORDER BY checked_at").all(edition, new Date(start).toISOString(), new Date(end).toISOString()) as Record<string, unknown>[];
+    for (const row of rows) { const index = Math.min(bucketCount - 1, Math.max(0, Math.floor((new Date(String(row.checked_at)).getTime() - start) / bucketMs))); const bucket = buckets[index]; if (Number(row.success)) bucket.successes += 1; else bucket.failures += 1; bucket.samples += 1; }
+    return buckets.map((bucket) => ({ ...bucket, percentage: calculateAvailability(bucket.successes, bucket.failures) }));
   }
 
   prune(retentionDays: number): number {
@@ -123,9 +153,10 @@ export class StatusDatabase {
 
 function numberOrNull(value: unknown): number | null { return typeof value === "number" ? value : null; }
 function mapSnapshot(row: Record<string, unknown>): PublicSnapshot {
+  const motdParts = decodeMotd(row.motd ? String(row.motd) : null);
   const java = row.edition === "JAVA" && row.players_online !== null ? {
     playersOnline: Number(row.players_online), playersMax: Number(row.players_max), versionName: String(row.version_name ?? "未知"),
-    latencyMs: Number(row.latency_ms), motd: String(row.motd ?? ""), favicon: row.favicon ? String(row.favicon) : null,
+    latencyMs: Number(row.latency_ms), motd: motdText(motdParts), motdParts, favicon: row.favicon ? String(row.favicon) : null,
   } : null;
   return {
     edition: row.edition as Edition, status: row.status as EndpointSnapshot["status"],
