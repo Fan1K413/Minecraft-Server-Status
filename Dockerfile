@@ -9,23 +9,14 @@ COPY packages/config/package.json packages/config/package.json
 COPY packages/database/package.json packages/database/package.json
 RUN apk add --no-cache python3 make g++ && pnpm install --frozen-lockfile
 
-FROM dependencies AS builder
+FROM dependencies AS web
 COPY . .
-RUN pnpm --filter web build && pnpm --filter monitor build
-
-FROM node:24-alpine AS runtime
-WORKDIR /app
-ENV NODE_ENV=production
-RUN addgroup -S app && adduser -S app -G app
-COPY --from=builder /app /app
-RUN chown -R app:app /app
-USER app
-
-FROM runtime AS web
 WORKDIR /app/apps/web
+RUN pnpm build
 EXPOSE 3000
-CMD ["node", "node_modules/next/dist/bin/next", "start", "-p", "3000"]
+CMD ["pnpm", "exec", "next", "start", "-p", "3000"]
 
-FROM runtime AS monitor
+FROM dependencies AS monitor
+COPY . .
 WORKDIR /app/apps/monitor
-CMD ["node_modules/.bin/tsx", "src/index.ts"]
+CMD ["pnpm", "exec", "tsx", "src/index.ts"]
