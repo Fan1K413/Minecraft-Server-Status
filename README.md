@@ -82,12 +82,59 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
-## Docker 部署
+## Docker / GHCR 部署
 
-将 `config/server.example.yaml` 复制为 `config/server.yaml`，提供所需环境变量后执行：
+GitHub Actions 会在 `main` 分支推送、`v*` 版本标签或手动触发时，先执行测试、类型检查和构建，再推送两个 GHCR 镜像：
+
+```text
+ghcr.io/<GitHub 所有者>/minecraft-server-status-web:sha-<commit>
+ghcr.io/<GitHub 所有者>/minecraft-server-status-monitor:sha-<commit>
+```
+
+生产环境建议使用不可变 SHA 标签或镜像 digest，不要使用会变化的 `main` 标签。
+
+### 部署主机准备
+
+1. 将配置模板复制为本地配置：
+
+   ```bash
+   cp config/server.example.yaml config/server.yaml
+   cp deploy/.env.example deploy/.env
+   ```
+
+2. 编辑 `deploy/.env`，填写实际镜像引用、`STATUS_DOMAIN` 与端点环境变量。`config/server.yaml` 和 `deploy/.env` 均不会提交到 Git。
+
+3. 如果 GHCR 包为私有包，在部署主机以只读包令牌登录。不要把令牌写入 `.env`、Compose 文件或命令参数：
+
+   ```bash
+   printf '%s' "$CR_PAT" | docker login ghcr.io -u GITHUB_USERNAME --password-stdin
+   ```
+
+   `CR_PAT` 应为专用的 classic PAT，最低仅授予 `read:packages`；组织启用 SSO 时还需授权该令牌。使用 Docker 的凭据存储，并在不再需要时执行 `docker logout ghcr.io`。
+
+4. 拉取并启动：
+
+   ```bash
+   docker compose --env-file deploy/.env -f deploy/compose.yaml pull
+   docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+   docker compose --env-file deploy/.env -f deploy/compose.yaml ps
+   ```
+
+状态页由 Caddy 在 `https://$STATUS_DOMAIN` 提供服务。Web 与 Monitor 不会直接公开端口。
+
+### 更新、回滚与数据
+
+更新时，将 `deploy/.env` 中的两个镜像引用改为新的 SHA/digest，然后执行：
 
 ```bash
-docker compose -f deploy/compose.yaml up -d --build
+docker compose --env-file deploy/.env -f deploy/compose.yaml pull
+docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+```
+
+回滚时恢复先前已验证的两个不可变镜像引用并重复以上命令。用以下方式检查服务：
+
+```bash
+curl -fsS https://$STATUS_DOMAIN/api/health/ready
 ```
 
 这是**单主机、单 Worker 写入**设计：Web 和 Worker 通过同一个本地持久卷使用 SQLite。不要在 NFS/SMB 等共享网络卷上使用 SQLite；需要多实例 Web、多个探测点或多个 Worker 时，应先迁移到 PostgreSQL。

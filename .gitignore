@@ -17,6 +17,7 @@ data/
 .env
 .env.*
 !.env.example
+!deploy/.env.example
 config/server.yaml
 *.db
 *.db-shm
