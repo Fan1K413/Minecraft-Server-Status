@@ -1,0 +1,10 @@
+{
+  "name": "@minecraft-status/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "tsc --noEmit", "migrate": "tsx src/migrate.ts", "seed": "tsx src/seed.ts" },
+  "dependencies": { "@minecraft-status/core": "workspace:*", "better-sqlite3": "^12.4.1" },
+  "devDependencies": { "@types/better-sqlite3": "^7.6.13" }
+}

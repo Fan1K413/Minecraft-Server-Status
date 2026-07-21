@@ -1,0 +1,42 @@
+services:
+  web:
+    build:
+      context: ..
+      target: web
+    environment:
+      DATABASE_URL: file:/data/status.db
+      SERVER_CONFIG_PATH: /app/config/server.yaml
+    volumes:
+      - status-data:/data
+      - ../config/server.yaml:/app/config/server.yaml:ro
+    restart: unless-stopped
+
+  monitor:
+    build:
+      context: ..
+      target: monitor
+    environment:
+      DATABASE_URL: file:/data/status.db
+      SERVER_CONFIG_PATH: /app/config/server.yaml
+    volumes:
+      - status-data:/data
+      - ../config/server.yaml:/app/config/server.yaml:ro
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.10-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  status-data:
+  caddy-data:
+  caddy-config:

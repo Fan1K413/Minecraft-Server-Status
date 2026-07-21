@@ -1,0 +1,22 @@
+{
+  "name": "minecraft-server-status",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": { "node": ">=22.0.0" },
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "dev:monitor": "pnpm --filter monitor dev",
+    "build": "pnpm --filter web build && pnpm --filter monitor build",
+    "typecheck": "pnpm --filter core typecheck && pnpm --filter config typecheck && pnpm --filter database typecheck && pnpm --filter web typecheck && pnpm --filter monitor typecheck",
+    "test": "vitest run",
+    "db:migrate": "pnpm --filter database migrate",
+    "db:seed": "pnpm --filter database seed"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.16"
+  }
+}

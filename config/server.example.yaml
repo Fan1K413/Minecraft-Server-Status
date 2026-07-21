@@ -1,0 +1,29 @@
+server:
+  name: "我的 Minecraft 服务器"
+  timezone: "Asia/Shanghai"
+
+java:
+  enabled: true
+  host: "${JAVA_SERVER_HOST}"
+  port: 25565
+  displayAddress: "play.example.com"
+
+bedrock:
+  enabled: true
+  host: "${BEDROCK_SERVER_HOST}"
+  port: 19132
+  displayAddress: "bedrock.example.com:19132"
+
+monitor:
+  intervalSeconds: 60
+  timeoutMs: 5000
+  downAfterFailures: 3
+  upAfterSuccesses: 2
+  staleAfterIntervals: 3
+  retentionDays: 90
+
+maintenance:
+  enabled: false
+  startsAt: null
+  endsAt: null
+  message: null

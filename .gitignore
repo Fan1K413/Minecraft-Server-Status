@@ -1,0 +1,12 @@
+node_modules/
+.next/
+dist/
+coverage/
+data/
+.env
+config/server.yaml
+*.db
+*.db-shm
+*.db-wal
+playwright-report/
+test-results/
