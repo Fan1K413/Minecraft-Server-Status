@@ -1,4 +1,4 @@
-{$STATUS_DOMAIN:localhost} {
+status.windking.fans {
   encode zstd gzip
   reverse_proxy web:3000
   header {

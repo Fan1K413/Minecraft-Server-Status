@@ -22,8 +22,10 @@ RUN chown -R app:app /app
 USER app
 
 FROM runtime AS web
+WORKDIR /app/apps/web
 EXPOSE 3000
-CMD ["node", "apps/web/node_modules/next/dist/bin/next", "start", "-p", "3000"]
+CMD ["node", "node_modules/next/dist/bin/next", "start", "-p", "3000"]
 
 FROM runtime AS monitor
-CMD ["node_modules/.bin/tsx", "apps/monitor/src/index.ts"]
+WORKDIR /app/apps/monitor
+CMD ["node_modules/.bin/tsx", "src/index.ts"]

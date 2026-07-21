@@ -1,26 +1,15 @@
 services:
-  volume-init:
-    image: ${WEB_IMAGE_REF:?Set WEB_IMAGE_REF in deploy/.env}
-    user: root
-    command: ["sh", "-c", "mkdir -p /data && chown -R app:app /data"]
-    volumes:
-      - status-data:/data
-    restart: "no"
-
   web:
-    image: ${WEB_IMAGE_REF:?Set WEB_IMAGE_REF in deploy/.env}
+    image: ghcr.io/fan1k413/minecraft-server-status-web:main
     pull_policy: always
     environment:
       DATABASE_URL: file:/data/status.db
-      SERVER_CONFIG_PATH: /app/config/server.yaml
-      JAVA_SERVER_HOST: ${JAVA_SERVER_HOST:-}
-      BEDROCK_SERVER_HOST: ${BEDROCK_SERVER_HOST:-}
+      SERVER_CONFIG_PATH: /config/server.yaml
+    ports:
+      - "127.0.0.1:15879:3000"
     volumes:
       - status-data:/data
-      - ${CONFIG_FILE:-../config/server.yaml}:/app/config/server.yaml:ro
-    depends_on:
-      volume-init:
-        condition: service_completed_successfully
+      - ../config/server.yaml:/config/server.yaml:ro
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health/live').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 30s
@@ -32,40 +21,17 @@ services:
     stop_grace_period: 20s
 
   monitor:
-    image: ${MONITOR_IMAGE_REF:?Set MONITOR_IMAGE_REF in deploy/.env}
+    image: ghcr.io/fan1k413/minecraft-server-status-monitor:main
     pull_policy: always
     environment:
       DATABASE_URL: file:/data/status.db
-      SERVER_CONFIG_PATH: /app/config/server.yaml
-      JAVA_SERVER_HOST: ${JAVA_SERVER_HOST:-}
-      BEDROCK_SERVER_HOST: ${BEDROCK_SERVER_HOST:-}
+      SERVER_CONFIG_PATH: /config/server.yaml
     volumes:
       - status-data:/data
-      - ${CONFIG_FILE:-../config/server.yaml}:/app/config/server.yaml:ro
-    depends_on:
-      volume-init:
-        condition: service_completed_successfully
+      - ../config/server.yaml:/config/server.yaml:ro
     restart: unless-stopped
     init: true
     stop_grace_period: 20s
 
-  caddy:
-    image: caddy:2.10-alpine
-    environment:
-      STATUS_DOMAIN: ${STATUS_DOMAIN:?Set STATUS_DOMAIN in deploy/.env}
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    depends_on:
-      web:
-        condition: service_healthy
-    restart: unless-stopped
-
 volumes:
   status-data:
-  caddy-data:
-  caddy-config:

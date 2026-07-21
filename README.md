@@ -120,7 +120,7 @@ ghcr.io/<GitHub 所有者>/minecraft-server-status-monitor:sha-<commit>
    docker compose --env-file deploy/.env -f deploy/compose.yaml ps
    ```
 
-状态页由 Caddy 在 `https://$STATUS_DOMAIN` 提供服务。Web 与 Monitor 不会直接公开端口。
+状态页 Web 服务仅绑定到宿主机回环地址 `127.0.0.1:15879`，请使用你已有的反向代理配置 HTTPS 与域名转发；Monitor 不公开任何端口。
 
 ### 更新、回滚与数据
 
