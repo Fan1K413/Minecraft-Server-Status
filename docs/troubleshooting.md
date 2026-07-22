@@ -47,7 +47,7 @@ docker compose -f compose.yaml up -d --force-recreate
 确认实际 digest：
 
 ```bash
-docker image inspect ghcr.io/fan1k413/minecraft-server-status-web:main --format '{{index .RepoDigests 0}}'
+docker image inspect ghcr.io/<owner>/minecraft-server-status-web:main --format '{{index .RepoDigests 0}}'
 ```
 
 ## Monitor 无法连接或长期退出
@@ -88,6 +88,27 @@ curl -fsS http://127.0.0.1:15879/api/v1/status
 
 页面上的手动检查仅是临时结果：Java 为 TCP 连通性，基岩为 UDP ping；它不会改变历史或状态机。
 
+## 手动检查按钮始终失败
+
+手动检查的浏览器 Origin 必须与 Web 容器的 `APP_BASE_URL` 一致。当前 Compose 使用：
+
+```text
+APP_BASE_URL=https://status.example.com
+```
+
+确认浏览器实际访问的域名与其一致；若使用别名域名，在 Web 容器添加 `PROBE_ALLOWED_ORIGINS=https://别名域名`。反向代理可将请求转发到 `127.0.0.1:15879`，但不应改写浏览器的公开 Origin。
+
+浏览器开发者工具中查看 `POST /api/v1/probe` 的 HTTP 状态、JSON 响应和 `X-Request-ID`。再用请求 ID 查询：
+
+```bash
+docker compose -f compose.yaml logs --tail=200 web
+```
+
+- `403`：公开 Origin 配置不匹配、缺失或请求不是浏览器同源请求。
+- `429`：同一 scope 20 秒内重复检查。
+- `503`：Web 无法读取配置或执行检查；查看 Web 日志。
+- `200` 且 `success: false`：HTTP 路由正常，继续检查容器对 Minecraft TCP/UDP 的出站连通性。
+
 ## 反向代理无法访问
 
 如果代理运行在宿主机，应代理到：
@@ -96,7 +117,7 @@ curl -fsS http://127.0.0.1:15879/api/v1/status
 http://127.0.0.1:15879
 ```
 
-如果 Compose 端口映射不是回环绑定，建议改成：
+如果需要只允许宿主机反向代理访问，可将 Compose 映射改为：
 
 ```yaml
 ports:

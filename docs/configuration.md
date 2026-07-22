@@ -17,15 +17,15 @@ server:
 
 java:
   enabled: true
-  host: "windking.fans"
+  host: "play.example.com"
   port: 25565
-  displayAddress: "windking.fans"
+  displayAddress: "play.example.com"
 
 bedrock:
   enabled: true
-  host: "windking.fans"
+  host: "bedrock.example.com"
   port: 19132
-  displayAddress: "bedrock.windking.fans:19132"
+  displayAddress: "bedrock.example.com:19132"
 
 monitor:
   intervalSeconds: 60
@@ -104,6 +104,8 @@ host: "${JAVA_SERVER_HOST}"
 | 变量 | 说明 |
 | --- | --- |
 | `SERVER_CONFIG_PATH` | 配置文件路径。默认 `./config/server.yaml`。容器使用 `/config/server.yaml`。 |
+| `APP_BASE_URL` | Web 容器的公开浏览器地址，例如 `https://status.example.com`。生产环境手动检查会要求浏览器 `Origin` 与该地址匹配。 |
+| `PROBE_ALLOWED_ORIGINS` | 可选的额外公开 Origin，逗号分隔；仅用于别名域名。 |
 | `DATABASE_URL` | SQLite URL，例如 `file:/data/status.db`。 |
 | `JAVA_SERVER_HOST` | 仅当 Java `host` 使用 `${JAVA_SERVER_HOST}` 时需要。 |
 | `BEDROCK_SERVER_HOST` | 仅当基岩 `host` 使用 `${BEDROCK_SERVER_HOST}` 时需要。 |

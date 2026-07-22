@@ -3,6 +3,7 @@ services:
     image: ghcr.io/fan1k413/minecraft-server-status-web:main
     pull_policy: always
     environment:
+      APP_BASE_URL: https://status.windking.fans
       DATABASE_URL: file:/data/status.db
       SERVER_CONFIG_PATH: /config/server.yaml
     ports:

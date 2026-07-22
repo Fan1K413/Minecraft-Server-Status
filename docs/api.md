@@ -15,8 +15,8 @@
   "configurationError": null,
   "server": {
     "name": "我的 Minecraft 服务器",
-    "java": { "enabled": true, "displayAddress": "windking.fans" },
-    "bedrock": { "enabled": true, "displayAddress": "bedrock.windking.fans:19132" }
+    "java": { "enabled": true, "displayAddress": "play.example.com" },
+    "bedrock": { "enabled": true, "displayAddress": "bedrock.example.com:19132" }
   },
   "java": {},
   "bedrock": {},
@@ -65,7 +65,7 @@ Java 快照可包含 `playersOnline`、`playersMax`、`versionName`、`latencyMs
 { "scope": "JAVA" }
 ```
 
-`scope` 仅允许 `JAVA`、`BEDROCK`、`all`。请求体最大 128 字节，浏览器请求进行同源校验，按来源和 scope 有 20 秒冷却。可能返回 `400`、`403`、`413`、`429`。
+`scope` 仅允许 `JAVA`、`BEDROCK`、`all`。请求体最大 128 字节，浏览器请求必须携带与 Web 容器 `APP_BASE_URL`（或 `PROBE_ALLOWED_ORIGINS`）匹配的 Origin，按来源和 scope 有 20 秒冷却。可能返回 `400`、`403`、`413`、`429`、`503`；所有响应带 `X-Request-ID`，可用于查询 Web 日志。
 
 Java 手动检查是 TCP 连通性检查；基岩是 UDP ping。它不等价于 Monitor 的完整 Java 协议采集。
 
@@ -74,7 +74,7 @@ Java 手动检查是 TCP 连通性检查；基岩是 UDP ping。它不等价于 
 返回 76×28 的整体状态 SVG 胶囊标签，可直接嵌入：
 
 ```html
-<img src="https://status.windking.fans/api/v1/status.svg" alt="Minecraft 服务器状态">
+<img src="https://status.example.com/api/v1/status.svg" alt="Minecraft 服务器状态">
 ```
 
 响应包含 `image/svg+xml`、30 秒缓存、CORS、`nosniff` 与严格 CSP。

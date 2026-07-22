@@ -7,8 +7,8 @@
 Compose 当前固定使用：
 
 ```text
-ghcr.io/fan1k413/minecraft-server-status-web:main
-ghcr.io/fan1k413/minecraft-server-status-monitor:main
+ghcr.io/<owner>/minecraft-server-status-web:main
+ghcr.io/<owner>/minecraft-server-status-monitor:main
 ```
 
 GitHub Actions 会在 PR 上验证测试/类型/构建；向 `main` 推送或创建 `v*` 标签时发布 GHCR 镜像。生产环境更推荐将 Compose 中的 `:main` 改为不可变 `sha-...` 标签或 digest，便于回滚。
@@ -67,19 +67,14 @@ Web 端口映射是：
 15879 -> 容器内 3000
 ```
 
-当前 Compose 使用 `"15879:3000"`，会绑定宿主机所有网络接口。若只希望宿主机反向代理访问，请改为：
-
-```yaml
-ports:
-  - "127.0.0.1:15879:3000"
-```
+当前 Compose 端口映射为 `"15879:3000"`，会在宿主机所有网络接口公开 `15879` 端口，可直接通过 `http://服务器公网IP:15879` 访问。Web 容器还配置了 `APP_BASE_URL=https://status.example.com`，它必须与用户浏览器访问的公开状态域名一致，才能使用手动检查功能。反向代理仍可转发到 `http://127.0.0.1:15879`。
 
 ## 反向代理
 
 宿主机 Caddy 示例：
 
 ```caddy
-status.windking.fans {
+status.example.com {
   reverse_proxy 127.0.0.1:15879
 }
 ```
@@ -99,7 +94,7 @@ docker compose -f compose.yaml up -d --force-recreate
 建议记录每次部署使用的镜像 digest：
 
 ```bash
-docker image inspect ghcr.io/fan1k413/minecraft-server-status-web:main --format '{{index .RepoDigests 0}}'
+docker image inspect ghcr.io/<owner>/minecraft-server-status-web:main --format '{{index .RepoDigests 0}}'
 ```
 
 回滚时将 `deploy/compose.yaml` 中两处镜像改为先前验证过的 SHA/digest，随后再次 `pull` 和 `up -d`。
