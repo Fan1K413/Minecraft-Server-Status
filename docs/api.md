@@ -24,7 +24,7 @@
 }
 ```
 
-Java 快照可包含 `playersOnline`、`playersMax`、`versionName`、`latencyMs`、`motd`、`motdParts`、`favicon`。基岩快照当前只用于状态。配置无法加载时返回 `UNKNOWN` 与 `configurationError`。
+Java 快照可包含 `playersOnline`、`playersMax`、`versionName`、`latencyMs`、`motd`、`motdParts`、`favicon`。接口字段保持稳定：服务端内部会按 SHA-256 去重 favicon，并仅在版本、MOTD 或图标变更时记录其历史，不影响当前快照的返回形式。基岩快照当前只用于状态。配置无法加载时返回 `UNKNOWN` 与 `configurationError`。
 
 ## `GET /api/v1/status/simple`
 
@@ -67,7 +67,7 @@ Java 快照可包含 `playersOnline`、`playersMax`、`versionName`、`latencyMs
 
 `scope` 仅允许 `JAVA`、`BEDROCK`、`all`。请求体最大 128 字节，浏览器请求必须携带与 Web 容器 `APP_BASE_URL`（或 `PROBE_ALLOWED_ORIGINS`）匹配的 Origin，按来源和 scope 有 20 秒冷却。可能返回 `400`、`403`、`413`、`429`、`503`；所有响应带 `X-Request-ID`，可用于查询 Web 日志。
 
-Java 手动检查是 TCP 连通性检查；基岩是 UDP ping。它不等价于 Monitor 的完整 Java 协议采集。
+Java 手动检查使用与 Monitor 相同的 Java Server List Ping；基岩是 UDP ping。检查仅返回临时结果，不会写入数据库或影响状态机。
 
 ## `GET /api/v1/status.svg`
 

@@ -99,6 +99,10 @@ docker image inspect ghcr.io/<owner>/minecraft-server-status-web:main --format '
 
 回滚时将 `deploy/compose.yaml` 中两处镜像改为先前验证过的 SHA/digest，随后再次 `pull` 和 `up -d`。
 
+## 数据库迁移与更新
+
+Web 和 Monitor 启动时会自动执行 SQLite schema 迁移；也可在镜像或本地工作区中运行 `pnpm db:migrate`，确认输出的 schema version。涉及数据库结构的镜像更新前，应先完成下方备份；迁移会保留既有原始检查记录，并将历史 favicon 去重、版本/MOTD/favicon 转换为变更事件。
+
 ## 数据与备份
 
 `../data` 是 SQLite 数据目录。不要将它放在 NFS、SMB 或其他网络共享存储上。
@@ -114,6 +118,8 @@ docker compose -f compose.yaml start monitor
 ```
 
 恢复前先在非生产位置验证数据库可打开；恢复后检查 `/api/health/ready`、页面和 Monitor 日志。
+
+原始检查记录按配置的 `retentionDays` 清理，但版本、MOTD 与图标变更事件会永久保留。清理记录不会立即缩小 `status.db` 文件；如需归还宿主机磁盘空间，请先备份并在停止 Monitor 的维护窗口使用 SQLite 的 `wal_checkpoint(TRUNCATE)` 与 `VACUUM`。不要直接删除 `status.db-wal` 或 `status.db-shm`。
 
 ## 已知部署限制
 

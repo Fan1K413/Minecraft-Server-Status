@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import net from "node:net";
+import minecraftProtocol from "minecraft-protocol";
+const { ping } = minecraftProtocol;
 import dgram from "node:dgram";
 import { randomUUID } from "node:crypto";
 import { loadServerConfig } from "@minecraft-status/config";
@@ -13,7 +14,12 @@ function sourceIp(request: NextRequest): string { return request.headers.get("x-
 function headers(requestId: string, extra: HeadersInit = {}): Headers { return new Headers({ "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "X-Request-ID": requestId, ...extra }); }
 function response(requestId: string, body: Record<string, unknown>, status = 200, extra: HeadersInit = {}): NextResponse { return NextResponse.json({ ...body, requestId }, { status, headers: headers(requestId, extra) }); }
 function log(event: string, fields: Record<string, unknown>): void { console.info(JSON.stringify({ event, ...fields })); }
-function tcpCheck(host: string, port: number, timeoutMs: number): Promise<boolean> { return new Promise((resolve) => { const socket = net.connect({ host, port }); let doneOnce = false; const done = (value: boolean) => { if (doneOnce) return; doneOnce = true; socket.destroy(); resolve(value); }; socket.once("connect", () => done(true)); socket.once("error", () => done(false)); socket.setTimeout(timeoutMs, () => done(false)); }); }
+function javaCheck(host: string, port: number, timeoutMs: number): Promise<boolean> { return new Promise((resolve) => {
+  let doneOnce = false;
+  const done = (value: boolean) => { if (doneOnce) return; doneOnce = true; resolve(value); };
+  const timer = setTimeout(() => done(false), timeoutMs);
+  ping({ host, port }, (error: Error | null) => { clearTimeout(timer); done(!error); });
+}); }
 function udpCheck(host: string, port: number, timeoutMs: number): Promise<boolean> { return new Promise((resolve) => { const socket = dgram.createSocket("udp4"); let doneOnce = false; const packet = Buffer.concat([Buffer.from([0x01]), Buffer.alloc(8), Buffer.from("00ffff00fefefefefdfdfdfd12345678", "hex"), Buffer.alloc(8)]); const done = (value: boolean) => { if (doneOnce) return; doneOnce = true; socket.close(); resolve(value); }; const timer = setTimeout(() => done(false), timeoutMs); socket.once("message", (message) => { clearTimeout(timer); done(message.length > 35 && message[0] === 0x1c); }); socket.once("error", () => { clearTimeout(timer); done(false); }); socket.send(packet, port, host, (error) => { if (error) { clearTimeout(timer); done(false); } }); }); }
 
 export async function POST(request: NextRequest) {
@@ -30,7 +36,7 @@ export async function POST(request: NextRequest) {
   if (now - previous < COOLDOWN_MS) return response(requestId, { error: "too many checks", code: "rate_limited" }, 429, { "Retry-After": String(Math.ceil((COOLDOWN_MS - (now - previous)) / 1000)) });
   try {
     const config = await loadServerConfig(); const editions = scope === "all" ? ["JAVA", "BEDROCK"] as const : [scope] as const;
-    const results = Object.fromEntries((await Promise.all(editions.map(async (edition) => { const endpoint = edition === "JAVA" ? config.java : config.bedrock; if (!endpoint?.enabled) return [edition, null] as const; const success = edition === "JAVA" ? await tcpCheck(endpoint.host, endpoint.port, config.monitor.timeoutMs) : await udpCheck(endpoint.host, endpoint.port, config.monitor.timeoutMs); return [edition, { success, latencyMs: Math.round(performance.now() - started) }] as const; }))).filter((entry): entry is ["JAVA" | "BEDROCK", { success: boolean; latencyMs: number }] => entry[1] !== null));
+    const results = Object.fromEntries((await Promise.all(editions.map(async (edition) => { const endpoint = edition === "JAVA" ? config.java : config.bedrock; if (!endpoint?.enabled) return [edition, null] as const; const success = edition === "JAVA" ? await javaCheck(endpoint.host, endpoint.port, config.monitor.timeoutMs) : await udpCheck(endpoint.host, endpoint.port, config.monitor.timeoutMs); return [edition, { success, latencyMs: Math.round(performance.now() - started) }] as const; }))).filter((entry): entry is ["JAVA" | "BEDROCK", { success: boolean; latencyMs: number }] => entry[1] !== null));
     cooldown.set(key, now); log("probe.completed", { requestId, scope, status: 200, elapsedMs: Math.round(performance.now() - started) });
     const single = scope === "all" ? null : results[scope]; return response(requestId, scope === "all" ? { scope, checkedAt: new Date().toISOString(), results } : { edition: scope, ...single, checkedAt: new Date().toISOString() });
   } catch (error) { log("probe.unavailable", { requestId, scope, message: error instanceof Error ? error.message.slice(0, 120) : "unknown" }); return response(requestId, { error: "probe unavailable", code: "probe_unavailable" }, 503); }

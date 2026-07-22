@@ -86,14 +86,14 @@ curl -fsS http://127.0.0.1:15879/api/v1/status
 
 等待连续失败达到 `downAfterFailures`（默认 3）后才会显示离线。恢复也需要连续成功达到 `upAfterSuccesses`（默认 2）。
 
-页面上的手动检查仅是临时结果：Java 为 TCP 连通性，基岩为 UDP ping；它不会改变历史或状态机。
+页面上的手动检查仅是临时结果：Java 使用与 Monitor 相同的 Java Server List Ping，基岩为 UDP ping；它不会改变历史或状态机。
 
 ## 手动检查按钮始终失败
 
 手动检查的浏览器 Origin 必须与 Web 容器的 `APP_BASE_URL` 一致。当前 Compose 使用：
 
 ```text
-APP_BASE_URL=https://status.example.com
+APP_BASE_URL=https://status.windking.fans
 ```
 
 确认浏览器实际访问的域名与其一致；若使用别名域名，在 Web 容器添加 `PROBE_ALLOWED_ORIGINS=https://别名域名`。反向代理可将请求转发到 `127.0.0.1:15879`，但不应改写浏览器的公开 Origin。
@@ -107,7 +107,15 @@ docker compose -f compose.yaml logs --tail=200 web
 - `403`：公开 Origin 配置不匹配、缺失或请求不是浏览器同源请求。
 - `429`：同一 scope 20 秒内重复检查。
 - `503`：Web 无法读取配置或执行检查；查看 Web 日志。
-- `200` 且 `success: false`：HTTP 路由正常，继续检查容器对 Minecraft TCP/UDP 的出站连通性。
+- `200` 且 `success: false`：HTTP 路由和来源授权均正常，但 Web 容器未能完成与目标的协议检查。先确认 Web 与 Monitor 使用同一镜像版本、相同的 `/config/server.yaml` 挂载；再在两个容器中对配置里的实际 Java 主机和端口分别运行：
+
+  ```bash
+  docker compose -f compose.yaml exec web node -e "require('dns').lookup('<Java主机>', { all: true }, console.log)"
+  docker compose -f compose.yaml exec monitor node -e "require('dns').lookup('<Java主机>', { all: true }, console.log)"
+  docker compose -f compose.yaml exec web node -e "const net=require('net');const s=net.connect({host:'<Java主机>',port:<端口>});s.setTimeout(5000);s.on('connect',()=>{console.log('connected');s.destroy()});s.on('timeout',()=>{console.log('timeout');s.destroy()});s.on('error',e=>console.log(e.code,e.message))"
+  ```
+
+  比较 DNS 返回的 IPv4/IPv6 地址，并检查 Docker/宿主机出站防火墙与目标端口。基岩版需要单独确认 UDP/RakNet 出站路径。
 
 ## 反向代理无法访问
 
