@@ -99,6 +99,20 @@ docker image inspect ghcr.io/<owner>/minecraft-server-status-web:main --format '
 
 回滚时将 `deploy/compose.yaml` 中两处镜像改为先前验证过的 SHA/digest，随后再次 `pull` 和 `up -d`。
 
+## 镜像体积与构建缓存
+
+Web 与 Monitor 均使用多阶段构建：运行镜像不包含 TypeScript、Vitest、pnpm store 或编译 `better-sqlite3` 所需的 Python/make/g++ 工具。Web 仅携带 Next standalone 产物；Monitor 仅携带自身源码和生产依赖。普通源码更新会复用由 lockfile 与 workspace manifests 决定的依赖层，因此服务器拉取的更新通常远小于完整构建镜像。
+
+如需确认实际占用，请在部署主机执行：
+
+```bash
+docker image ls 'ghcr.io/<owner>/minecraft-server-status-*'
+docker history ghcr.io/<owner>/minecraft-server-status-web:main
+docker history ghcr.io/<owner>/minecraft-server-status-monitor:main
+```
+
+`docker history` 中不应出现完整仓库、测试文档或构建工具层。首次发布仍需下载基础镜像和生产依赖；之后应由镜像层缓存复用未变部分。
+
 ## 数据库迁移与更新
 
 Web 和 Monitor 启动时会自动执行 SQLite schema 迁移；也可在镜像或本地工作区中运行 `pnpm db:migrate`，确认输出的 schema version。涉及数据库结构的镜像更新前，应先完成下方备份；迁移会保留既有原始检查记录，并将历史 favicon 去重、版本/MOTD/favicon 转换为变更事件。

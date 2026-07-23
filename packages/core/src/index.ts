@@ -74,22 +74,39 @@ export interface TrendPoint {
   at: string;
   playersOnline: number | null;
   latencyMs: number | null;
+  gap?: boolean;
+}
+
+export function markTrendGaps(points: TrendPoint[], intervalSeconds: number): TrendPoint[] {
+  if (points.length < 2) return points;
+  const result: TrendPoint[] = [points[0]];
+  const threshold = intervalSeconds * 2_000;
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1]; const current = points[index];
+    const previousAt = new Date(previous.at).getTime(); const currentAt = new Date(current.at).getTime();
+    if (Number.isFinite(previousAt) && Number.isFinite(currentAt) && currentAt - previousAt > threshold) {
+      result.push({ at: new Date(previousAt + (currentAt - previousAt) / 2).toISOString(), playersOnline: null, latencyMs: null, gap: true });
+    }
+    result.push(current);
+  }
+  return result;
 }
 
 export function downsampleTrend(points: TrendPoint[], maxPoints: number): TrendPoint[] {
   if (points.length <= maxPoints) return points;
-  const bucketSize = Math.ceil(points.length / maxPoints);
   const result: TrendPoint[] = [];
-  for (let index = 0; index < points.length; index += bucketSize) {
-    const bucket = points.slice(index, index + bucketSize);
-    const players = bucket.map((point) => point.playersOnline).filter((value): value is number => value !== null);
-    const latency = bucket.map((point) => point.latencyMs).filter((value): value is number => value !== null);
-    result.push({
-      at: bucket[0].at,
-      playersOnline: players.length ? Math.round(players.reduce((sum, value) => sum + value, 0) / players.length) : null,
-      latencyMs: latency.length ? Math.round(latency.reduce((sum, value) => sum + value, 0) / latency.length) : null,
-    });
+  let segment: TrendPoint[] = [];
+  const pushSegment = () => {
+    if (!segment.length) return;
+    const stride = Math.max(1, Math.ceil(segment.length / Math.max(1, maxPoints - points.filter((point) => point.playersOnline === null).length)));
+    for (let index = 0; index < segment.length; index += stride) result.push(segment[index]);
+    if (result.at(-1) !== segment.at(-1)) result.push(segment.at(-1)!);
+    segment = [];
+  };
+  for (const point of points) {
+    if (point.playersOnline === null) { pushSegment(); result.push(point); } else segment.push(point);
   }
+  pushSegment();
   return result;
 }
 

@@ -203,14 +203,11 @@ export class StatusDatabase {
     return row ? mapSnapshot(row) : null;
   }
 
-  getHistory(rangeHours: number, maxPoints: number, now = new Date()): TrendPoint[] {
+  getHistory(rangeHours: number, now = new Date()): TrendPoint[] {
     const since = new Date(now.getTime() - rangeHours * 3_600_000).toISOString();
     const rows = this.db.prepare(`SELECT checked_at, players_online, latency_ms FROM check_results
       WHERE edition = 'JAVA' AND checked_at >= ? ORDER BY checked_at ASC`).all(since) as Record<string, unknown>[];
-    const stride = Math.max(1, Math.ceil(rows.length / maxPoints));
-    const selected = rows.filter((_, index) => index % stride === 0);
-    if (rows.length && selected.at(-1) !== rows.at(-1)) selected.push(rows.at(-1)!);
-    return selected.map((row) => ({
+    return rows.map((row) => ({
       at: String(row.checked_at), playersOnline: numberOrNull(row.players_online), latencyMs: numberOrNull(row.latency_ms),
     }));
   }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { StatusDatabase } from "@minecraft-status/database";
+import { markTrendGaps, downsampleTrend } from "@minecraft-status/core";
 import { getDashboardData } from "../lib";
 import { AutoRefresh, CopyAddress } from "../components/client";
 import { AvailabilityControl, PlayerTrendPanel, ProbeButton } from "../components/dashboard-controls";
@@ -11,7 +12,7 @@ export const metadata: Metadata = { title: "Minecraft 服务器状态", descript
 const labels: Record<string, string> = { OPERATIONAL: "运行正常", OUTAGE: "暂时离线", PARTIAL_OUTAGE: "部分可用", MAINTENANCE: "计划维护", UNKNOWN: "状态未知" };
 
 export default async function Page() {
-  const data = await getDashboardData(); const database = new StatusDatabase(); const trend = database.getHistory(168, 420); const availability = { java: database.getAvailabilityBuckets("JAVA", 168), bedrock: database.getAvailabilityBuckets("BEDROCK", 168) }; database.close();
+  const data = await getDashboardData(); const database = new StatusDatabase(); const trend = data.config ? downsampleTrend(markTrendGaps(database.getHistory(168), data.config.monitor.intervalSeconds), 420) : []; const availability = { java: database.getAvailabilityBuckets("JAVA", 168), bedrock: database.getAvailabilityBuckets("BEDROCK", 168) }; database.close();
   if (data.configurationError || !data.config) return <main className="shell"><p className="eyebrow">CONFIGURATION REQUIRED</p><h1>状态页尚未配置</h1><p>请复制 <code>config/server.example.yaml</code> 为 <code>config/server.yaml</code>，并填入受信任的服务器地址。</p></main>;
   const javaStatus = data.java?.status ?? "UNKNOWN"; const bedrockStatus = data.bedrock?.status ?? "UNKNOWN"; const sharedDetails = data.java?.java ?? null; const enabledEndpoints = [data.config.java?.enabled, data.config.bedrock?.enabled].filter(Boolean).length;
   const checkedAt = data.checkedAt ? new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short", timeZone: data.config.server.timezone }).format(new Date(data.checkedAt)) : "等待首次检测";
