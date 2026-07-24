@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import minecraftProtocol from "minecraft-protocol";
-const { ping } = minecraftProtocol;
+import { pingJava } from "@minecraft-status/java-ping";
 import dgram from "node:dgram";
 import { randomUUID } from "node:crypto";
 import { loadServerConfig } from "@minecraft-status/config";
@@ -14,12 +13,7 @@ function sourceIp(request: NextRequest): string { return request.headers.get("x-
 function headers(requestId: string, extra: HeadersInit = {}): Headers { return new Headers({ "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "X-Request-ID": requestId, ...extra }); }
 function response(requestId: string, body: Record<string, unknown>, status = 200, extra: HeadersInit = {}): NextResponse { return NextResponse.json({ ...body, requestId }, { status, headers: headers(requestId, extra) }); }
 function log(event: string, fields: Record<string, unknown>): void { console.info(JSON.stringify({ event, ...fields })); }
-function javaCheck(host: string, port: number, timeoutMs: number): Promise<boolean> { return new Promise((resolve) => {
-  let doneOnce = false;
-  const done = (value: boolean) => { if (doneOnce) return; doneOnce = true; resolve(value); };
-  const timer = setTimeout(() => done(false), timeoutMs);
-  ping({ host, port }, (error: Error | null) => { clearTimeout(timer); done(!error); });
-}); }
+function javaCheck(host: string, port: number, timeoutMs: number): Promise<boolean> { return pingJava(host, port, timeoutMs).then(() => true).catch(() => false); }
 function udpCheck(host: string, port: number, timeoutMs: number): Promise<boolean> { return new Promise((resolve) => { const socket = dgram.createSocket("udp4"); let doneOnce = false; const packet = Buffer.concat([Buffer.from([0x01]), Buffer.alloc(8), Buffer.from("00ffff00fefefefefdfdfdfd12345678", "hex"), Buffer.alloc(8)]); const done = (value: boolean) => { if (doneOnce) return; doneOnce = true; socket.close(); resolve(value); }; const timer = setTimeout(() => done(false), timeoutMs); socket.once("message", (message) => { clearTimeout(timer); done(message.length > 35 && message[0] === 0x1c); }); socket.once("error", () => { clearTimeout(timer); done(false); }); socket.send(packet, port, host, (error) => { if (error) { clearTimeout(timer); done(false); } }); }); }
 
 export async function POST(request: NextRequest) {

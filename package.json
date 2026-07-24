@@ -8,7 +8,7 @@
     "dev": "pnpm --filter web dev",
     "dev:monitor": "pnpm --filter monitor dev",
     "build": "pnpm --filter web build && pnpm --filter monitor build",
-    "typecheck": "pnpm --filter core typecheck && pnpm --filter config typecheck && pnpm --filter database typecheck && pnpm --filter web typecheck && pnpm --filter monitor typecheck",
+    "typecheck": "pnpm --filter core typecheck && pnpm --filter config typecheck && pnpm --filter database typecheck && pnpm --filter java-ping typecheck && pnpm --filter web typecheck && pnpm --filter monitor typecheck",
     "test": "vitest run",
     "db:migrate": "pnpm --filter database migrate",
     "db:seed": "pnpm --filter database seed"

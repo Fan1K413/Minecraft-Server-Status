@@ -88,7 +88,7 @@ status.example.com {
 ```bash
 cd deploy
 docker compose -f compose.yaml pull
-docker compose -f compose.yaml up -d --force-recreate
+docker compose -f compose.yaml up -d
 ```
 
 建议记录每次部署使用的镜像 digest：

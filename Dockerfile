@@ -12,6 +12,7 @@ COPY apps/monitor/package.json apps/monitor/package.json
 COPY packages/core/package.json packages/core/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/database/package.json packages/database/package.json
+COPY packages/java-ping/package.json packages/java-ping/package.json
 RUN apk add --no-cache python3 make g++
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 
@@ -21,7 +22,9 @@ COPY . .
 FROM source AS web-builder
 RUN pnpm --filter web build
 
-FROM base AS web
+FROM node:24-alpine AS runtime
+
+FROM runtime AS web
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
@@ -34,7 +37,7 @@ CMD ["node", "apps/web/server.js"]
 FROM source AS monitor-builder
 RUN pnpm --filter monitor deploy --legacy --prod /opt/monitor
 
-FROM base AS monitor
+FROM runtime AS monitor
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=monitor-builder /opt/monitor ./

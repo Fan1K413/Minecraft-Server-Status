@@ -8,7 +8,7 @@
     "@minecraft-status/config": "workspace:*",
     "@minecraft-status/core": "workspace:*",
     "@minecraft-status/database": "workspace:*",
-    "minecraft-protocol": "^1.60.0",
+    "@minecraft-status/java-ping": "workspace:*",
     "tsx": "^4.20.6"
   }
 }
