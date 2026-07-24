@@ -19,8 +19,12 @@ describe("status rules", () => {
     expect(overallStatus("OPERATIONAL", "OUTAGE", false)).toBe("PARTIAL_OUTAGE");
     expect(overallStatus("OUTAGE", "OUTAGE", true)).toBe("MAINTENANCE");
   });
-  it("keeps missing player data as gaps while downsampling", () => {
-    expect(downsampleTrend([{ at: "1", playersOnline: 3, latencyMs: 1 }, { at: "2", playersOnline: null, latencyMs: null }], 1)[0].playersOnline).toBe(3);
+  it("keeps valid samples when a long null run exceeds the point budget", () => {
+    const points = [{ at: "2026-07-23T00:00:00.000Z", playersOnline: 1, latencyMs: 10 }, ...Array.from({ length: 449 }, (_, index) => ({ at: new Date(Date.UTC(2026, 6, 23, 0, index + 1)).toISOString(), playersOnline: null, latencyMs: null })), { at: "2026-07-23T08:00:00.000Z", playersOnline: 0, latencyMs: 12 }, { at: "2026-07-23T08:01:00.000Z", playersOnline: null, latencyMs: null, gap: true }];
+    const sampled = downsampleTrend(points, 360);
+    expect(sampled.filter((point) => point.playersOnline !== null)).toHaveLength(2);
+    expect(sampled.filter((point) => point.playersOnline === null)).toHaveLength(2);
+    expect(sampled.at(-1)?.at).toBe("2026-07-23T08:01:00.000Z");
     expect(calculateAvailability(9, 1)).toBe(90);
   });
 });

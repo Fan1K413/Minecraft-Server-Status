@@ -77,10 +77,26 @@ export interface TrendPoint {
   gap?: boolean;
 }
 
+export function normalizeTrendWindow(points: TrendPoint[], from: Date, to: Date): TrendPoint[] {
+  const start = from.getTime(); const end = to.getTime();
+  const result = points.filter((point) => {
+    const at = new Date(point.at).getTime();
+    return Number.isFinite(at) && at >= start && at <= end;
+  }).sort((left, right) => new Date(left.at).getTime() - new Date(right.at).getTime());
+  const startAt = from.toISOString(); const endAt = to.toISOString();
+  if (!result.some((point) => point.at === startAt)) result.unshift({ at: startAt, playersOnline: null, latencyMs: null, gap: true });
+  if (!result.some((point) => point.at === endAt)) result.push({ at: endAt, playersOnline: null, latencyMs: null, gap: true });
+  return result;
+}
+
+export function buildTrendWindow(points: TrendPoint[], from: Date, to: Date, intervalSeconds: number, maxPoints: number): TrendPoint[] {
+  return downsampleTrend(markTrendGaps(normalizeTrendWindow(points, from, to), intervalSeconds), maxPoints);
+}
+
 export function markTrendGaps(points: TrendPoint[], intervalSeconds: number): TrendPoint[] {
   if (points.length < 2) return points;
   const result: TrendPoint[] = [points[0]];
-  const threshold = intervalSeconds * 2_000;
+  const threshold = intervalSeconds * 1_500;
   for (let index = 1; index < points.length; index += 1) {
     const previous = points[index - 1]; const current = points[index];
     const previousAt = new Date(previous.at).getTime(); const currentAt = new Date(current.at).getTime();
@@ -94,20 +110,18 @@ export function markTrendGaps(points: TrendPoint[], intervalSeconds: number): Tr
 
 export function downsampleTrend(points: TrendPoint[], maxPoints: number): TrendPoint[] {
   if (points.length <= maxPoints) return points;
-  const result: TrendPoint[] = [];
-  let segment: TrendPoint[] = [];
-  const pushSegment = () => {
-    if (!segment.length) return;
-    const stride = Math.max(1, Math.ceil(segment.length / Math.max(1, maxPoints - points.filter((point) => point.playersOnline === null).length)));
-    for (let index = 0; index < segment.length; index += stride) result.push(segment[index]);
-    if (result.at(-1) !== segment.at(-1)) result.push(segment.at(-1)!);
-    segment = [];
-  };
-  for (const point of points) {
-    if (point.playersOnline === null) { pushSegment(); result.push(point); } else segment.push(point);
+  const anchors = new Set<TrendPoint>([points[0], points.at(-1)!]);
+  for (let index = 0; index < points.length;) {
+    if (points[index].playersOnline !== null) { index += 1; continue; }
+    const start = index;
+    while (index < points.length && points[index].playersOnline === null) index += 1;
+    const run = points.slice(start, index);
+    anchors.add(run.find((point) => point.gap) ?? run[0]);
   }
-  pushSegment();
-  return result;
+  const candidates = points.filter((point) => point.playersOnline !== null && !anchors.has(point));
+  const budget = Math.max(0, maxPoints - anchors.size);
+  const sampled = budget >= candidates.length ? candidates : Array.from({ length: budget }, (_, index) => candidates[Math.round((index * (candidates.length - 1)) / Math.max(1, budget - 1))]);
+  return [...anchors, ...sampled].sort((left, right) => new Date(left.at).getTime() - new Date(right.at).getTime());
 }
 
 export type HistoryRange = "24h" | "3d" | "7d" | "15d" | "30d" | "all";

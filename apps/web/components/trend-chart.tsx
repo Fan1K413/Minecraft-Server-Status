@@ -3,13 +3,13 @@
 import { useMemo, useState } from "react";
 import type { TrendPoint } from "@minecraft-status/core";
 
-export function TrendChart({ points, label = "24小时" }: { points: TrendPoint[]; label?: string }) {
+export function TrendChart({ points, label = "24小时", from, to }: { points: TrendPoint[]; label?: string; from: string; to: string }) {
   const values = points.map((point) => point.playersOnline).filter((value): value is number => value !== null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [activeX, setActiveX] = useState<number | null>(null);
   const valid = useMemo(() => points.map((point, index) => point.playersOnline === null ? -1 : index).filter((index) => index >= 0), [points]);
   const maximum = Math.max(...values, 1);
-  const startTime = new Date(points[0].at).getTime(); const endTime = new Date(points.at(-1)?.at ?? points[0].at).getTime();
+  const startTime = new Date(from).getTime(); const endTime = new Date(to).getTime();
   const coordinate = (index: number) => { const time = new Date(points[index].at).getTime(); const x = Number.isFinite(time) && endTime > startTime ? ((time - startTime) / (endTime - startTime)) * 100 : points.length === 1 ? 0 : (index / (points.length - 1)) * 100; return { x, y: 100 - ((points[index].playersOnline ?? 0) / maximum) * 88 - 6 }; };
   const path = (() => { const segments: string[] = []; let segment: string[] = []; points.forEach((point, index) => { if (point.playersOnline === null) { if (segment.length) segments.push(segment.join(" ")); segment = []; return; } const { x, y } = coordinate(index); segment.push(`${segment.length ? "L" : "M"}${x.toFixed(2)},${y.toFixed(2)}`); }); if (segment.length) segments.push(segment.join(" ")); return segments.join(" "); })();
   const active = activeIndex === null ? null : points[activeIndex];

@@ -203,10 +203,15 @@ export class StatusDatabase {
     return row ? mapSnapshot(row) : null;
   }
 
+  getEarliestCheckAt(edition: Edition, now = new Date()): Date | null {
+    const row = this.db.prepare("SELECT MIN(checked_at) AS earliest FROM check_results WHERE edition = ? AND checked_at <= ?").get(edition, now.toISOString()) as { earliest: string | null };
+    return row.earliest ? new Date(row.earliest) : null;
+  }
+
   getHistory(rangeHours: number, now = new Date()): TrendPoint[] {
     const since = new Date(now.getTime() - rangeHours * 3_600_000).toISOString();
     const rows = this.db.prepare(`SELECT checked_at, players_online, latency_ms FROM check_results
-      WHERE edition = 'JAVA' AND checked_at >= ? ORDER BY checked_at ASC`).all(since) as Record<string, unknown>[];
+      WHERE edition = 'JAVA' AND checked_at >= ? AND checked_at <= ? ORDER BY checked_at ASC, id ASC`).all(since, now.toISOString()) as Record<string, unknown>[];
     return rows.map((row) => ({
       at: String(row.checked_at), playersOnline: numberOrNull(row.players_online), latencyMs: numberOrNull(row.latency_ms),
     }));

@@ -43,7 +43,7 @@ Java 快照可包含 `playersOnline`、`playersMax`、`versionName`、`latencyMs
 
 ## `GET /api/v1/history?range=...`
 
-`range` 可为 `24h`、`3d`、`7d`、`15d`、`30d`、`all`；默认 `7d`。`all` 受当前 90 天保留期限制。
+`range` 可为 `24h`、`3d`、`7d`、`15d`、`30d`、`all`；默认 `7d`。`all` 受当前 `retentionDays` 保留期限制，并从保留期起点与最早已记录 Java 检测时间中的较晚者开始。
 
 ```json
 {
