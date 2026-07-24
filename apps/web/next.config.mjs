@@ -6,4 +6,5 @@ const appDirectory = path.dirname(fileURLToPath(import.meta.url));
 export default {
   output: "standalone",
   outputFileTracingRoot: path.join(appDirectory, "../.."),
+  serverExternalPackages: ["minecraft-protocol"],
 };

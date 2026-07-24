@@ -1,4 +1,5 @@
-import { pingJava as fetchJavaStatus, JavaPingError } from "@minecraft-status/java-ping";
+import minecraftProtocol from "minecraft-protocol";
+const { ping } = minecraftProtocol;
 import dgram from "node:dgram";
 import { loadServerConfig } from "@minecraft-status/config";
 import { normalizeMotd, motdText } from "@minecraft-status/core";
@@ -15,15 +16,19 @@ type ProbeResult = ProbeSuccess | ProbeFailure;
 async function pingJava(host: string, port: number, timeoutMs: number): Promise<ProbeResult> {
   const started = performance.now();
   try {
-    const data = await fetchJavaStatus(host, port, timeoutMs);
+    const response = await Promise.race([
+      new Promise<any>((resolve, reject) => ping({ host, port }, (error: Error | null, result: unknown) => error ? reject(error) : resolve(result))),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), timeoutMs)),
+    ]);
+    const data = response as { players?: { online?: number; max?: number }; version?: { name?: string }; description?: unknown; favicon?: string; latency?: number };
     const motdParts = normalizeMotd(data.description);
     return { success: true, java: {
       playersOnline: Number(data.players?.online ?? 0), playersMax: Number(data.players?.max ?? 0),
-      versionName: String(data.version?.name ?? "未知"), latencyMs: Math.round(performance.now() - started),
+      versionName: String(data.version?.name ?? "未知"), latencyMs: Number.isFinite(data.latency) ? Math.round(Number(data.latency)) : Math.round(performance.now() - started),
       motd: motdText(motdParts), motdParts, favicon: typeof data.favicon === "string" && data.favicon.length <= 100_000 ? data.favicon : null,
     }};
   } catch (error) {
-    return { success: false, errorCode: error instanceof JavaPingError && error.code === "TIMEOUT" ? "TIMEOUT" : "JAVA_PING_FAILED" };
+    return { success: false, errorCode: error instanceof Error && error.message === "TIMEOUT" ? "TIMEOUT" : "JAVA_PING_FAILED" };
   }
 }
 

@@ -12,7 +12,6 @@ COPY apps/monitor/package.json apps/monitor/package.json
 COPY packages/core/package.json packages/core/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/database/package.json packages/database/package.json
-COPY packages/java-ping/package.json packages/java-ping/package.json
 RUN apk add --no-cache python3 make g++
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 
